@@ -359,7 +359,7 @@ class GL:
         # cor da textura conforme a posição do mapeamento. Dentro da classe GPU já está
         # implementadado um método para a leitura de imagens.
 
-        triangle_points = GL.prepare_points(coord * 2)
+        triangle_points, zs = GL.prepare_points(coord * 2, True)
         
         for i in range(len(coordIndex) - 3):
             if colorPerVertex and color and colorIndex:
@@ -380,14 +380,15 @@ class GL:
                                   int(color[offset_2 + 2] * 255))
 
             if i % 2 == 0:
-                x0, y0, z0 = int(triangle_points[coordIndex[i + 0]][0]), int(triangle_points[coordIndex[i + 0]][1]), int(triangle_points[coordIndex[i + 0]][2])
-                x1, y1, z1 = int(triangle_points[coordIndex[i + 1]][0]), int(triangle_points[coordIndex[i + 1]][1]), int(triangle_points[coordIndex[i + 1]][2])
-                x2, y2, z2 = int(triangle_points[coordIndex[i + 2]][0]), int(triangle_points[coordIndex[i + 2]][1]), int(triangle_points[coordIndex[i + 2]][2])
+                x0, y0 = int(triangle_points[coordIndex[i + 0]][0]), int(triangle_points[coordIndex[i + 0]][1])
+                x1, y1 = int(triangle_points[coordIndex[i + 1]][0]), int(triangle_points[coordIndex[i + 1]][1])
+                x2, y2 = int(triangle_points[coordIndex[i + 2]][0]), int(triangle_points[coordIndex[i + 2]][1])
+                z0, z1, z2 = zs[coordIndex[i + 0]], zs[coordIndex[i + 1]], zs[coordIndex[i + 2]]
             else:
-                x2, y2, z2 = int(triangle_points[coordIndex[i + 0]][0]), int(triangle_points[coordIndex[i + 0]][1]), int(triangle_points[coordIndex[i + 0]][2])
-                x1, y1, z1 = int(triangle_points[coordIndex[i + 1]][0]), int(triangle_points[coordIndex[i + 1]][1]), int(triangle_points[coordIndex[i + 1]][2]) 
-                x0, y0, z0 = int(triangle_points[coordIndex[i + 2]][0]), int(triangle_points[coordIndex[i + 2]][1]), int(triangle_points[coordIndex[i + 2]][2])
-
+                x2, y2 = int(triangle_points[coordIndex[i + 0]][0]), int(triangle_points[coordIndex[i + 0]][1])
+                x1, y1 = int(triangle_points[coordIndex[i + 1]][0]), int(triangle_points[coordIndex[i + 1]][1])
+                x0, y0 = int(triangle_points[coordIndex[i + 2]][0]), int(triangle_points[coordIndex[i + 2]][1])
+                z0, z1, z2 = zs[coordIndex[i + 0]], zs[coordIndex[i + 1]], zs[coordIndex[i + 2]]
             
             # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P0 -> P1.
             L0 = lambda x, y: (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0)
@@ -412,16 +413,16 @@ class GL:
                         gamma = 1 - alpha - betha
 
                         z = z0 * alpha + z2 * gamma + z1 * betha
-                        if z == 0:
-                            z = 1
-
-                        # print(f"{alpha=}, {betha=}, {gamma=}, {z0=}, {z1=}, {z2=}, {z=}")
 
                         if colorPerVertex and color and colorIndex:
                             c = (int(vertex_color_0[0] * alpha + vertex_color_1[0] * betha + vertex_color_2[0] * gamma) / z,
                                  int(vertex_color_0[1] * alpha + vertex_color_1[1] * betha + vertex_color_2[1] * gamma) / z, 
                                  int(vertex_color_0[2] * alpha + vertex_color_1[2] * betha + vertex_color_2[2] * gamma) / z)
-                            GL.framebuffer[si, sj] = c
+                                 
+                        else:
+                            c = (255, 255, 255)
+                        
+                        GL.framebuffer[si, sj] = c
 
         GL.supersampling_2x()
 
@@ -438,10 +439,11 @@ class GL:
             [           0,          0,                             -1,                                 0]])
 
     @staticmethod
-    def prepare_points(point):
+    def prepare_points(point, return_z: bool = False):
         GL.lookAt = np.linalg.inv(GL.orient_mat_cam).dot(np.linalg.inv(GL.trans_mat_cam))
 
         triangle_points = []
+        zs = []
         for i in range(0, len(point), 3):
             current_point = np.array([[point[i]],
                                       [point[i + 1]],
@@ -454,10 +456,13 @@ class GL:
 
             # Leva o ponto para as coordenadas de perspectiva
             current_point = GL.view_point(GL.fieldOfView, GL.near, GL.far, GL.width * 2, GL.height * 2).dot(current_point)
+            zs.append(current_point[2])
             current_point /= current_point[3][0]
             current_point = GL.screen_mat.dot(current_point)
             triangle_points.append(current_point)
-        
+        if return_z:
+            return triangle_points, zs
+
         return triangle_points
 
     @staticmethod
