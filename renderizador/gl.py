@@ -359,23 +359,71 @@ class GL:
         # cor da textura conforme a posição do mapeamento. Dentro da classe GPU já está
         # implementadado um método para a leitura de imagens.
 
-        # Os prints abaixo são só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("IndexedFaceSet : ")
-        if coord:
-            print("\tpontos(x, y, z) = {0}, coordIndex = {1}".format(coord, coordIndex))
-        print("colorPerVertex = {0}".format(colorPerVertex))
-        if colorPerVertex and color and colorIndex:
-            print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
-        if texCoord and texCoordIndex:
-            print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
-        if current_texture:
-            image = gpu.GPU.load_texture(current_texture[0])
-            print("\t Matriz com image = {0}".format(image))
-            print("\t Dimensões da image = {0}".format(image.shape))
-        print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
+        triangle_points = GL.prepare_points(coord * 2)
+        
+        for i in range(len(coordIndex) - 3):
+            if colorPerVertex and color and colorIndex:
+                offset_0 = (colorIndex[i + 0]) * 3
+                offset_1 = (colorIndex[i + 1]) * 3
+                offset_2 = (colorIndex[i + 2]) * 3
 
-        # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixels([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+                vertex_color_0 = (int(color[offset_0 + 0] * 255),
+                                  int(color[offset_0 + 1] * 255), 
+                                  int(color[offset_0 + 2] * 255))
+                
+                vertex_color_1 = (int(color[offset_1 + 0] * 255),
+                                  int(color[offset_1 + 1] * 255), 
+                                  int(color[offset_1 + 2] * 255))
+
+                vertex_color_2 = (int(color[offset_2 + 0] * 255),
+                                  int(color[offset_2 + 1] * 255), 
+                                  int(color[offset_2 + 2] * 255))
+
+            if i % 2 == 0:
+                x0, y0, z0 = int(triangle_points[coordIndex[i + 0]][0]), int(triangle_points[coordIndex[i + 0]][1]), int(triangle_points[coordIndex[i + 0]][2])
+                x1, y1, z1 = int(triangle_points[coordIndex[i + 1]][0]), int(triangle_points[coordIndex[i + 1]][1]), int(triangle_points[coordIndex[i + 1]][2])
+                x2, y2, z2 = int(triangle_points[coordIndex[i + 2]][0]), int(triangle_points[coordIndex[i + 2]][1]), int(triangle_points[coordIndex[i + 2]][2])
+            else:
+                x2, y2, z2 = int(triangle_points[coordIndex[i + 0]][0]), int(triangle_points[coordIndex[i + 0]][1]), int(triangle_points[coordIndex[i + 0]][2])
+                x1, y1, z1 = int(triangle_points[coordIndex[i + 1]][0]), int(triangle_points[coordIndex[i + 1]][1]), int(triangle_points[coordIndex[i + 1]][2]) 
+                x0, y0, z0 = int(triangle_points[coordIndex[i + 2]][0]), int(triangle_points[coordIndex[i + 2]][1]), int(triangle_points[coordIndex[i + 2]][2])
+
+            
+            # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P0 -> P1.
+            L0 = lambda x, y: (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0)
+
+            # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P1 -> P2.
+            L1 = lambda x, y: (x - x1) * (y2 - y1) - (y - y1) * (x2 - x1)
+
+            # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P2 -> P0.
+            L2 = lambda x, y: (x - x2) * (y0 - y2) - (y - y2) * (x0 - x2)
+
+            # Determina se o ponto está dentro do triângulo ou não.
+            inside = lambda x, y: L0(x, y) >= 0 and L1(x, y) >= 0 and L2(x, y) >= 0
+
+            alpha_denominator = -(x0 - x1) * (y2 - y1) + (y0 - y1) * (x2 - x1)
+            betha_denominator = -(x1 - x2) * (y0 - y2) + (y1 - y2) * (x0 - x2)
+
+            for si in range(GL.width * 2):
+                for sj in range(GL.height * 2):
+                    if inside(si + 0.5, sj + 0.5):
+                        alpha = (-(si - x1) * (y2 - y1) + (sj - y1) * (x2 - x1)) / alpha_denominator
+                        betha = (-(si - x2) * (y0 - y2) + (sj - y2) * (x0 - x2)) / betha_denominator
+                        gamma = 1 - alpha - betha
+
+                        z = z0 * alpha + z2 * gamma + z1 * betha
+                        if z == 0:
+                            z = 1
+
+                        # print(f"{alpha=}, {betha=}, {gamma=}, {z0=}, {z1=}, {z2=}, {z=}")
+
+                        if colorPerVertex and color and colorIndex:
+                            c = (int(vertex_color_0[0] * alpha + vertex_color_1[0] * betha + vertex_color_2[0] * gamma) / z,
+                                 int(vertex_color_0[1] * alpha + vertex_color_1[1] * betha + vertex_color_2[1] * gamma) / z, 
+                                 int(vertex_color_0[2] * alpha + vertex_color_1[2] * betha + vertex_color_2[2] * gamma) / z)
+                            GL.framebuffer[si, sj] = c
+
+        GL.supersampling_2x()
 
     @staticmethod
     def view_point(fovx, near, far, width, height):
