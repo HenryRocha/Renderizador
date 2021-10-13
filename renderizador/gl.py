@@ -20,6 +20,8 @@ class GL:
     near = 0.01   # plano de corte próximo
     far = 1000    # plano de corte distante
 
+    world_transform_stack = []  # pilha de transformações do mundo
+
     @staticmethod
     def setup(width, height, near=0.01, far=1000):
         """Definr parametros para câmera de razão de aspecto, plano próximo e distante."""
@@ -157,6 +159,14 @@ class GL:
                                        [                  0,                    0, 1, 0],
                                        [                  0,                    0, 0, 1]])
 
+        ans = GL.trans_mat.dot(GL.rot_mat).dot(GL.scale_mat)
+
+        if bool(GL.world_transform_stack) == True:
+            ans = np.dot(GL.world_transform_stack[len(GL.world_transform_stack) - 1], ans)
+
+        GL.world_transform_stack += [ans]
+        GL.mat_mundo: np.array = ans
+
     @staticmethod
     def transform_out():
         """Função usada para renderizar (na verdade coletar os dados) de Transform."""
@@ -167,6 +177,8 @@ class GL:
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Saindo de Transform")
+        if len(GL.world_transform_stack) > 0:
+            GL.world_transform_stack.pop()
 
     @staticmethod
     def triangleStripSet(point, stripCount, colors):
@@ -379,7 +391,6 @@ class GL:
 
     @staticmethod
     def prepare_points(point):
-        GL.mat_mundo: np.array = GL.trans_mat.dot(GL.rot_mat).dot(GL.scale_mat)
         GL.lookAt = np.linalg.inv(GL.orient_mat_cam).dot(np.linalg.inv(GL.trans_mat_cam))
 
         triangle_points = []
