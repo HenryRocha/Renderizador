@@ -359,7 +359,11 @@ class GL:
         # cor da textura conforme a posição do mapeamento. Dentro da classe GPU já está
         # implementadado um método para a leitura de imagens.
 
-        triangle_points, zs = GL.prepare_points(coord * 2, True)
+        triangle_points = GL.prepare_points(coord * 2)
+
+        
+        if texCoord and texCoordIndex and current_texture:
+            texture = gpu.GPU.load_texture(current_texture[0])
         
         for i in range(len(coordIndex) - 3):
             if colorPerVertex and color and colorIndex:
@@ -380,16 +384,19 @@ class GL:
                                   int(color[offset_2 + 2] * 255))
 
             if i % 2 == 0:
-                x0, y0 = int(triangle_points[coordIndex[i + 0]][0]), int(triangle_points[coordIndex[i + 0]][1])
-                x1, y1 = int(triangle_points[coordIndex[i + 1]][0]), int(triangle_points[coordIndex[i + 1]][1])
-                x2, y2 = int(triangle_points[coordIndex[i + 2]][0]), int(triangle_points[coordIndex[i + 2]][1])
-                z0, z1, z2 = zs[coordIndex[i + 0]], zs[coordIndex[i + 1]], zs[coordIndex[i + 2]]
+                x0, y0, z0 = (triangle_points[coordIndex[i + 0]][0]), (triangle_points[coordIndex[i + 0]][1]), triangle_points[coordIndex[i + 0]][2][0]
+                x1, y1, z1 = (triangle_points[coordIndex[i + 1]][0]), (triangle_points[coordIndex[i + 1]][1]), triangle_points[coordIndex[i + 1]][2][0]
+                x2, y2, z2 = (triangle_points[coordIndex[i + 2]][0]), (triangle_points[coordIndex[i + 2]][1]), triangle_points[coordIndex[i + 2]][2][0]
+
             else:
-                x2, y2 = int(triangle_points[coordIndex[i + 0]][0]), int(triangle_points[coordIndex[i + 0]][1])
-                x1, y1 = int(triangle_points[coordIndex[i + 1]][0]), int(triangle_points[coordIndex[i + 1]][1])
-                x0, y0 = int(triangle_points[coordIndex[i + 2]][0]), int(triangle_points[coordIndex[i + 2]][1])
-                z0, z1, z2 = zs[coordIndex[i + 0]], zs[coordIndex[i + 1]], zs[coordIndex[i + 2]]
+                x2, y2, z2 = (triangle_points[coordIndex[i + 0]][0]), (triangle_points[coordIndex[i + 0]][1]), triangle_points[coordIndex[i + 0]][2][0]
+                x1, y1, z1 = (triangle_points[coordIndex[i + 1]][0]), (triangle_points[coordIndex[i + 1]][1]), triangle_points[coordIndex[i + 1]][2][0]
+                x0, y0, z0 = (triangle_points[coordIndex[i + 2]][0]), (triangle_points[coordIndex[i + 2]][1]), triangle_points[coordIndex[i + 2]][2][0]
             
+            z0 = 1 / z0
+            z1 = 1 / z1
+            z2 = 1 / z2
+
             # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P0 -> P1.
             L0 = lambda x, y: (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0)
 
@@ -414,11 +421,34 @@ class GL:
 
                         z = z0 * alpha + z2 * gamma + z1 * betha
 
+                        # print(f"{alpha=}, {betha=}, {gamma=}, {z0=}, {z1=}, {z2=}, {z=}")
+
                         if colorPerVertex and color and colorIndex:
-                            c = (int(vertex_color_0[0] * alpha + vertex_color_1[0] * betha + vertex_color_2[0] * gamma) / z,
-                                 int(vertex_color_0[1] * alpha + vertex_color_1[1] * betha + vertex_color_2[1] * gamma) / z, 
-                                 int(vertex_color_0[2] * alpha + vertex_color_1[2] * betha + vertex_color_2[2] * gamma) / z)
-                                 
+                            c = ((vertex_color_0[0] * alpha + vertex_color_1[0] * betha + vertex_color_2[0] * gamma),
+                                 (vertex_color_0[1] * alpha + vertex_color_1[1] * betha + vertex_color_2[1] * gamma), 
+                                 (vertex_color_0[2] * alpha + vertex_color_1[2] * betha + vertex_color_2[2] * gamma))
+
+                        elif texCoord and texCoordIndex and current_texture:
+                            offset_1 = texCoordIndex[i + 0] * 2
+                            offset_2 = texCoordIndex[i + 1] * 2
+                            offset_3 = texCoordIndex[i + 2] * 2
+
+                            uv_vertex_1 = [texCoord[offset_1], texCoord[offset_1 + 1]]
+                            uv_vertex_2 = [texCoord[offset_2], texCoord[offset_2 + 1]]
+                            uv_vertex_3 = [texCoord[offset_3], texCoord[offset_3 + 1]]
+
+                            uv_1 = [t * z0 for t in uv_vertex_1]
+                            uv_2 = [t * z1 for t in uv_vertex_2]
+                            uv_3 = [t * z2 for t in uv_vertex_3]
+
+                            u =  (((uv_1[0] * alpha + uv_2[0] * betha + uv_3[0] * gamma) / z) * (texture.shape[0] - 1))
+                            v = -(((uv_1[1] * alpha + uv_2[1] * betha + uv_3[1] * gamma) / z) * (texture.shape[1] - 1))
+
+                            # print(f"{u=}, {v=}")
+
+                            img_color = texture[int(v)][int(u)]
+                            c = tuple(img_color[:3])
+                        
                         else:
                             c = (255, 255, 255)
                         
@@ -439,11 +469,10 @@ class GL:
             [           0,          0,                             -1,                                 0]])
 
     @staticmethod
-    def prepare_points(point, return_z: bool = False):
+    def prepare_points(point):
         GL.lookAt = np.linalg.inv(GL.orient_mat_cam).dot(np.linalg.inv(GL.trans_mat_cam))
 
         triangle_points = []
-        zs = []
         for i in range(0, len(point), 3):
             current_point = np.array([[point[i]],
                                       [point[i + 1]],
@@ -456,12 +485,11 @@ class GL:
 
             # Leva o ponto para as coordenadas de perspectiva
             current_point = GL.view_point(GL.fieldOfView, GL.near, GL.far, GL.width * 2, GL.height * 2).dot(current_point)
-            zs.append(current_point[2])
+            actual_z = current_point[2][0]
             current_point /= current_point[3][0]
             current_point = GL.screen_mat.dot(current_point)
+            current_point[2][0] = actual_z
             triangle_points.append(current_point)
-        if return_z:
-            return triangle_points, zs
 
         return triangle_points
 
