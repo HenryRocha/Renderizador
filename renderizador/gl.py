@@ -11,7 +11,9 @@ Disciplina: Computação Gráfica
 Data:
 """
 
-import time         # Para operações com tempo
+import time
+
+from PIL.Image import NORMAL         # Para operações com tempo
 
 import gpu          # Simula os recursos de uma GPU
 import numpy as np
@@ -39,6 +41,12 @@ class GL:
                                   [            0,                        0, 0,              1]])
         GL.framebuffer = np.zeros([width * 2, height * 2, 3], dtype=np.uint)
 
+        GL.has_light = False
+        GL.light_ambient = [0, 0, 0]
+        GL.light_dir = [0, 0, 0]
+        GL.light_intensity = 0
+        GL.light_color = [0, 0, 0]
+
     @staticmethod
     def triangleSet(point, colors):
         """Função usada para renderizar TriangleSet."""
@@ -55,10 +63,15 @@ class GL:
 
         triangle_points = GL.prepare_points(point * 2)
 
-        color_r = int(colors["diffuseColor"][0] * 255)
-        color_g = int(colors["diffuseColor"][1] * 255)
-        color_b = int(colors["diffuseColor"][2] * 255)
-        color = (color_r, color_g, color_b)
+        color = None
+        if GL.has_light:
+            ambient = GL.add_ambient_light(colors["diffuseColor"])
+            lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
+            blinn_phong = GL.add_blinn_phong(colors["shininess"], 1, colors["specularColor"])
+            object_base_color = np.array(colors["emissiveColor"])
+            color = (object_base_color + ambient + lambert + blinn_phong) * 255
+        else:
+            color = np.array(colors["diffuseColor"]).astype(int) * 255
 
         for i in range(0, len(triangle_points), 3):
             x0, y0 = int(triangle_points[i][0]), int(triangle_points[i][1])
@@ -203,10 +216,15 @@ class GL:
         # print(f"triangleStripSet: {point}")
         # print(f"triangleStripSet: {stripCount}")
 
-        color_r = int(colors["diffuseColor"][0] * 255)
-        color_g = int(colors["diffuseColor"][1] * 255)
-        color_b = int(colors["diffuseColor"][2] * 255)
-        color = (color_r, color_g, color_b)
+        color = None
+        if GL.has_light:
+            ambient = GL.add_ambient_light(colors["diffuseColor"])
+            lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
+            blinn_phong = GL.add_blinn_phong(colors["shininess"], 1, colors["specularColor"])
+            object_base_color = np.array(colors["emissiveColor"])
+            color = (object_base_color + ambient + lambert + blinn_phong) * 255
+        else:
+            color = np.array(colors["diffuseColor"]).astype(int) * 255
 
         for i in range(stripCount[0] - 2):                                            
             if i % 2 == 0:
@@ -261,10 +279,15 @@ class GL:
 
         triangle_points = GL.prepare_points(point * 2)
 
-        color_r = int(colors["diffuseColor"][0] * 255)
-        color_g = int(colors["diffuseColor"][1] * 255)
-        color_b = int(colors["diffuseColor"][2] * 255)
-        color = (color_r, color_g, color_b)
+        color = None
+        if GL.has_light:
+            ambient = GL.add_ambient_light(colors["diffuseColor"])
+            lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
+            blinn_phong = GL.add_blinn_phong(colors["shininess"], 1, colors["specularColor"])
+            object_base_color = np.array(colors["emissiveColor"])
+            color = (object_base_color + ambient + lambert + blinn_phong) * 255
+        else:
+            color = np.array(colors["diffuseColor"]).astype(int) * 255
 
         for i in range(len(index) - 3):
             if i % 2 == 0:
@@ -525,8 +548,29 @@ class GL:
         # os triângulos.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Sphere : radius = {0}".format(radius)) # imprime no terminal o raio da esfera
-        print("Sphere : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print("Sphere : radius = {0}".format(radius)) # imprime no terminal o raio da esfera
+        # print("Sphere : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print(colors)
+        # radius = 100
+        color = None
+        if GL.has_light:
+            ambient = GL.add_ambient_light(colors["diffuseColor"])
+            lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
+            blinn_phong = GL.add_blinn_phong(colors["shininess"], 1, colors["specularColor"])
+            object_base_color = np.array(colors["emissiveColor"])
+            color = (object_base_color + ambient + lambert + blinn_phong) * 255
+        else:
+            color = np.array(colors["diffuseColor"]).astype(int) * 255
+
+        inside = lambda x, y: x*x + y*y <= radius*radius
+
+        for si in range(GL.width * 2):
+            for sj in range(GL.height * 2):
+                if inside(si + 0.5, sj + 0.5):
+                    GL.framebuffer[si, sj] = color
+                    
+        GL.supersampling_2x()
+
 
     @staticmethod
     def navigationInfo(headlight):
@@ -550,10 +594,17 @@ class GL:
         # longo de raios paralelos de uma distância infinita.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("DirectionalLight : ambientIntensity = {0}".format(ambientIntensity))
-        print("DirectionalLight : color = {0}".format(color)) # imprime no terminal
-        print("DirectionalLight : intensity = {0}".format(intensity)) # imprime no terminal
-        print("DirectionalLight : direction = {0}".format(direction)) # imprime no terminal
+        # print("DirectionalLight : ambientIntensity = {0}".format(ambientIntensity))
+        # print("DirectionalLight : color = {0}".format(color)) # imprime no terminal
+        # print("DirectionalLight : intensity = {0}".format(intensity)) # imprime no terminal
+        # print("DirectionalLight : direction = {0}".format(direction)) # imprime no terminal
+        # print("AAAAAAAAAA")
+
+        GL.has_light = True
+        GL.light_ambient = ambientIntensity
+        GL.light_color = color
+        GL.light_intensity = intensity
+        GL.light_dir = direction
 
     @staticmethod
     def pointLight(ambientIntensity, color, intensity, location):
@@ -565,10 +616,16 @@ class GL:
         # zero. A iluminação do nó PointLight diminui com a distância especificada.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("PointLight : ambientIntensity = {0}".format(ambientIntensity))
-        print("PointLight : color = {0}".format(color)) # imprime no terminal
-        print("PointLight : intensity = {0}".format(intensity)) # imprime no terminal
-        print("PointLight : location = {0}".format(location)) # imprime no terminal
+        # print("PointLight : ambientIntensity = {0}".format(ambientIntensity))
+        # print("PointLight : color = {0}".format(color)) # imprime no terminal
+        # print("PointLight : intensity = {0}".format(intensity)) # imprime no terminal
+        # print("PointLight : location = {0}".format(location)) # imprime no terminal
+        # print("BBBBBBBBBBBBBBBB")
+
+        GL.has_light = True
+        GL.light_ambient = ambientIntensity
+        GL.light_color = np.array(color)
+        GL.light_intensity = intensity
 
     @staticmethod
     def fog(visibilityRange, color):
@@ -653,6 +710,18 @@ class GL:
         value_changed = [0, 0, 1, 0]
 
         return value_changed
+    
+    @staticmethod
+    def add_blinn_phong(shine, distance, specular_color):
+        return np.array([x * GL.light_intensity * distance ** (shine * 128) for x in specular_color]) * GL.light_color
+    
+    @staticmethod
+    def add_lambert(obj_difuse_color, normal):
+        return np.array([max(0, x * np.dot(GL.light_dir, normal) * GL.light_intensity) for x in obj_difuse_color])
+    
+    @staticmethod
+    def add_ambient_light(obj_difuse_color):
+        return np.array([x * GL.light_intensity for x in obj_difuse_color]) * GL.light_color
 
     # Para o futuro (Não para versão atual do projeto.)
     def vertex_shader(self, shader):
