@@ -67,9 +67,9 @@ class GL:
         if GL.has_light:
             ambient = GL.add_ambient_light(colors["diffuseColor"])
             lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
-            blinn_phong = GL.add_blinn_phong(colors["shininess"], 1, colors["specularColor"])
+            phong = GL.add_phong(colors["shininess"], 1, colors["specularColor"])
             object_base_color = np.array(colors["emissiveColor"])
-            color = (object_base_color + ambient + lambert + blinn_phong) * 255
+            color = (object_base_color + ambient + lambert + phong) * 255
         else:
             color = np.array(colors["diffuseColor"]).astype(int) * 255
 
@@ -220,9 +220,9 @@ class GL:
         if GL.has_light:
             ambient = GL.add_ambient_light(colors["diffuseColor"])
             lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
-            blinn_phong = GL.add_blinn_phong(colors["shininess"], 1, colors["specularColor"])
+            phong = GL.add_phong(colors["shininess"], 1, colors["specularColor"])
             object_base_color = np.array(colors["emissiveColor"])
-            color = (object_base_color + ambient + lambert + blinn_phong) * 255
+            color = (object_base_color + ambient + lambert + phong) * 255
         else:
             color = np.array(colors["diffuseColor"]).astype(int) * 255
 
@@ -283,9 +283,9 @@ class GL:
         if GL.has_light:
             ambient = GL.add_ambient_light(colors["diffuseColor"])
             lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
-            blinn_phong = GL.add_blinn_phong(colors["shininess"], 1, colors["specularColor"])
+            phong = GL.add_phong(colors["shininess"], 1, colors["specularColor"])
             object_base_color = np.array(colors["emissiveColor"])
-            color = (object_base_color + ambient + lambert + blinn_phong) * 255
+            color = (object_base_color + ambient + lambert + phong) * 255
         else:
             color = np.array(colors["diffuseColor"]).astype(int) * 255
 
@@ -556,9 +556,9 @@ class GL:
         if GL.has_light:
             ambient = GL.add_ambient_light(colors["diffuseColor"])
             lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
-            blinn_phong = GL.add_blinn_phong(colors["shininess"], 1, colors["specularColor"])
+            phong = GL.add_phong(colors["shininess"], 1, colors["specularColor"])
             object_base_color = np.array(colors["emissiveColor"])
-            color = (object_base_color + ambient + lambert + blinn_phong) * 255
+            color = (object_base_color + ambient + lambert + phong) * 255
         else:
             color = np.array(colors["diffuseColor"]).astype(int) * 255
 
@@ -712,7 +712,7 @@ class GL:
         return value_changed
     
     @staticmethod
-    def add_blinn_phong(shine, distance, specular_color):
+    def add_phong(shine, distance, specular_color):
         return np.array([x * GL.light_intensity * distance ** (shine * 128) for x in specular_color]) * GL.light_color
     
     @staticmethod
