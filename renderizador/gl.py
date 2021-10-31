@@ -47,6 +47,7 @@ class GL:
         GL.light_intensity = 0
         GL.light_color = np.zeros([1, 3])
         GL.location = np.zeros([1, 3])
+        GL.view_vector = np.array([0, 0, 1])
 
     @staticmethod
     def triangleSet(point, colors):
@@ -98,8 +99,9 @@ class GL:
                 for sj in range(GL.height * 2):
                     if inside(si + 0.5, sj + 0.5):
                         if GL.has_light:
-                            dist = abs(np.sum(np.array([si, sj, 0]) - GL.location))
-                            phong = GL.add_phong(colors["shininess"], dist, colors["specularColor"])
+                            half_vector = GL.light_dir + GL.view_vector
+                            half_vector = half_vector /  np.linalg.norm(N)
+                            phong = GL.add_blinn_phong(colors["shininess"], half_vector, colors["specularColor"], N)
                             color = (lambert + phong + object_base_color + ambient) * 255
                         GL.framebuffer[si, sj] = color
             
@@ -265,8 +267,9 @@ class GL:
                 for sj in range(GL.height * 2):
                     if inside(si + 0.5, sj + 0.5):
                         if GL.has_light:
-                            dist = 1
-                            phong = GL.add_phong(colors["shininess"], dist, colors["specularColor"])
+                            half_vector = GL.light_dir + GL.view_vector
+                            half_vector = half_vector /  np.linalg.norm(N)
+                            phong = GL.add_blinn_phong(colors["shininess"], half_vector, colors["specularColor"], N)
                             color = (object_base_color + ambient + lambert + phong) * 255
                         GL.framebuffer[si, sj] = color
                         # gpu.GPU.set_pixel(si, sj, color_r, color_g, color_b)
@@ -331,8 +334,9 @@ class GL:
                 for sj in range(GL.height * 2):
                     if inside(si + 0.5, sj + 0.5):
                         if GL.has_light:
-                            dist = 1
-                            phong = GL.add_phong(colors["shininess"], dist, colors["specularColor"])
+                            half_vector = GL.light_dir + GL.view_vector
+                            half_vector = half_vector /  np.linalg.norm(N)
+                            phong = GL.add_blinn_phong(colors["shininess"], half_vector, colors["specularColor"])
                             color = (object_base_color + ambient + lambert + phong) * 255
 
                         GL.framebuffer[si, sj] = color
@@ -573,24 +577,58 @@ class GL:
         # print("Sphere : colors = {0}".format(colors)) # imprime no terminal as cores
         # print(colors)
         # radius = 100
+        
+        triangles = GL.sphere_triangles(radius)
+        # [((x, y, z), (x, y, z), (x, y, z)), ((x, y, z), (x, y, z), (x, y, z))]
+
         color = None
         if GL.has_light:
             ambient = GL.add_ambient_light(colors["diffuseColor"])
             object_base_color = np.array(colors["emissiveColor"])
-            color = (object_base_color + ambient) * 255
+            
         else:
             color = np.array(colors["diffuseColor"]).astype(int) * 255
 
+        for t in triangles:
+            a = np.array(t[0])
+            b = np.array(t[1])
+            c = np.array(t[2])
 
-        inside = lambda x, y: x*x + y*y <= radius*radius
+            x0, y0, z0 = a[0], a[1], a[2]
+            x1, y1, z1 = b[0], b[1], b[2]
+            x2, y2, z2 = c[0], c[1], c[2]
 
-        for si in range(GL.width * 2):
-            for sj in range(GL.height * 2):
-                if inside(si + 0.5, sj + 0.5):
-                    GL.framebuffer[si, sj] = color
-                    
+            if GL.has_light:
+                N = np.cross(c-a, b-a)
+                N = N / np.linalg.norm(N)
+
+                lambert = GL.add_lambert(colors["diffuseColor"], N)
+
+            # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P0 -> P1.
+            L0 = lambda x, y: (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0)
+
+            # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P1 -> P2.
+            L1 = lambda x, y: (x - x1) * (y2 - y1) - (y - y1) * (x2 - x1)
+
+            # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P2 -> P0.
+            L2 = lambda x, y: (x - x2) * (y0 - y2) - (y - y2) * (x0 - x2)
+
+            # Determina se o ponto está dentro do triângulo ou não.
+            inside = lambda x, y: L0(x, y) >= 0 and L1(x, y) >= 0 and L2(x, y) >= 0
+
+            for si in range(GL.width * 2):
+                for sj in range(GL.height * 2):
+                    if inside(si + 0.5, sj + 0.5):
+                        if GL.has_light:
+                            half_vector = GL.light_dir + GL.view_vector
+                            half_vector = half_vector /  np.linalg.norm(N)
+                            phong = GL.add_blinn_phong(colors["shininess"], half_vector, colors["specularColor"], N)
+                            color = (lambert + phong + object_base_color + ambient) * 255
+                            # print(lambert, phong, object_base_color, ambient)
+                            # exit()
+                        GL.framebuffer[si, sj] = color
+        print("AA")
         GL.supersampling_2x()
-
 
     @staticmethod
     def navigationInfo(headlight):
@@ -733,9 +771,9 @@ class GL:
         return value_changed
     
     @staticmethod
-    def add_phong(shine, distance, specular_color):
-        return np.array([x * GL.light_intensity * distance ** (shine * 128) for x in specular_color]) * GL.light_color
-    
+    def add_blinn_phong(shine, half_vector, specular_color, normal):
+        return np.multiply(np.multiply(GL.light_color, np.dot(half_vector, normal) ** int(np.exp2(shine * 6 + 1))), specular_color)
+        
     @staticmethod
     def add_lambert(obj_difuse_color, normal):
         return np.array([max(0, x * np.dot(GL.light_dir, normal) * GL.light_intensity) for x in obj_difuse_color])
@@ -750,3 +788,43 @@ class GL:
 
     def fragment_shader(self, shader):
         """Para no futuro implementar um fragment shader."""
+
+    @staticmethod
+    def sphere_triangles(radius, step=10):
+        """
+        Create a list of triangles on a sphere
+        """
+        import math
+
+        triangles = []
+        for theta in range(0, 360, step):
+            for phi in range(0, 360, step):
+                r_theta = math.radians(theta)
+                cos_r_theta = math.cos(r_theta)
+                sin_r_theta = math.sin(r_theta)
+                r_theta_step = math.radians(theta + step)
+                cos_r_theta_step = math.cos(r_theta_step)
+                sin_r_theta_step = math.sin(r_theta_step)
+                
+                r_phi = math.radians(phi)
+                cos_r_phi = math.cos(r_phi)
+                sin_r_phi = math.sin(r_phi)
+                r_phi_step = math.radians(phi + step)
+                cos_r_phi_step = math.cos(r_phi_step)
+                sin_r_phi_step = math.sin(r_phi_step)
+
+                p1 = (radius * cos_r_theta * cos_r_phi,
+                    radius * sin_r_theta * cos_r_phi,
+                    radius * sin_r_phi)
+                p2 = (radius * cos_r_theta * cos_r_phi_step,
+                    radius * sin_r_theta * cos_r_phi_step,
+                    radius * sin_r_phi_step)
+                p3 = (radius * cos_r_theta_step * cos_r_phi,
+                    radius * sin_r_theta_step * cos_r_phi,
+                    radius * sin_r_phi)
+                p4 = (radius * cos_r_theta_step * cos_r_phi_step,
+                    radius * sin_r_theta_step * cos_r_phi_step,
+                    radius * sin_r_phi_step)
+                triangles.append((p1, p2, p3))
+                triangles.append((p2, p4, p3))
+        return triangles
