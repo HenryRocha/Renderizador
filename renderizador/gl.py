@@ -42,10 +42,11 @@ class GL:
         GL.framebuffer = np.zeros([width * 2, height * 2, 3], dtype=np.uint)
 
         GL.has_light = False
-        GL.light_ambient = [0, 0, 0]
-        GL.light_dir = [0, 0, 0]
+        GL.light_ambient = np.zeros([1, 3])
+        GL.light_dir = np.zeros([1, 3])
         GL.light_intensity = 0
-        GL.light_color = [0, 0, 0]
+        GL.light_color = np.zeros([1, 3])
+        GL.location = np.zeros([1, 3])
 
     @staticmethod
     def triangleSet(point, colors):
@@ -66,10 +67,7 @@ class GL:
         color = None
         if GL.has_light:
             ambient = GL.add_ambient_light(colors["diffuseColor"])
-            lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
-            phong = GL.add_phong(colors["shininess"], 1, colors["specularColor"])
             object_base_color = np.array(colors["emissiveColor"])
-            color = (object_base_color + ambient + lambert + phong) * 255
         else:
             color = np.array(colors["diffuseColor"]).astype(int) * 255
 
@@ -77,6 +75,12 @@ class GL:
             x0, y0 = int(triangle_points[i][0]), int(triangle_points[i][1])
             x1, y1 = int(triangle_points[i + 1][0]), int(triangle_points[i + 1][1])
             x2, y2 = int(triangle_points[i + 2][0]), int(triangle_points[i + 2][1])
+
+            if GL.has_light:
+                N = np.cross(x2-x0, x2-x0)
+                N = N / np.linalg.norm(N)
+
+                lambert = GL.add_lambert(colors["diffuseColor"], N)
 
             # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P0 -> P1.
             L0 = lambda x, y: (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0)
@@ -93,6 +97,10 @@ class GL:
             for si in range(GL.width * 2):
                 for sj in range(GL.height * 2):
                     if inside(si + 0.5, sj + 0.5):
+                        if GL.has_light:
+                            dist = abs(np.sum(np.array([si, sj, 0]) - GL.location))
+                            phong = GL.add_phong(colors["shininess"], dist, colors["specularColor"])
+                            color = (lambert + phong + object_base_color + ambient) * 255
                         GL.framebuffer[si, sj] = color
             
         GL.supersampling_2x()
@@ -219,10 +227,8 @@ class GL:
         color = None
         if GL.has_light:
             ambient = GL.add_ambient_light(colors["diffuseColor"])
-            lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
-            phong = GL.add_phong(colors["shininess"], 1, colors["specularColor"])
             object_base_color = np.array(colors["emissiveColor"])
-            color = (object_base_color + ambient + lambert + phong) * 255
+            
         else:
             color = np.array(colors["diffuseColor"]).astype(int) * 255
 
@@ -235,8 +241,13 @@ class GL:
                 x2, y2 = int(triangle_points[i][0]), int(triangle_points[i][1])
                 x1, y1 = int(triangle_points[i + 1][0]), int(triangle_points[i + 1][1])
                 x0, y0 = int(triangle_points[i + 2][0]), int(triangle_points[i + 2][1])
-            
-            print(x0, y0, x1, y1, x2, y2)
+
+            if GL.has_light:
+                N = np.cross(x2-x0, x2-x0)
+                N = N / np.linalg.norm(N)
+
+                lambert = GL.add_lambert(colors["diffuseColor"], N)
+
 
             # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P0 -> P1.
             L0 = lambda x, y: (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0)
@@ -253,6 +264,10 @@ class GL:
             for si in range(GL.width * 2):
                 for sj in range(GL.height * 2):
                     if inside(si + 0.5, sj + 0.5):
+                        if GL.has_light:
+                            dist = 1
+                            phong = GL.add_phong(colors["shininess"], dist, colors["specularColor"])
+                            color = (object_base_color + ambient + lambert + phong) * 255
                         GL.framebuffer[si, sj] = color
                         # gpu.GPU.set_pixel(si, sj, color_r, color_g, color_b)
             
@@ -282,10 +297,8 @@ class GL:
         color = None
         if GL.has_light:
             ambient = GL.add_ambient_light(colors["diffuseColor"])
-            lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
-            phong = GL.add_phong(colors["shininess"], 1, colors["specularColor"])
             object_base_color = np.array(colors["emissiveColor"])
-            color = (object_base_color + ambient + lambert + phong) * 255
+            
         else:
             color = np.array(colors["diffuseColor"]).astype(int) * 255
 
@@ -298,6 +311,9 @@ class GL:
                 x2, y2 = int(triangle_points[index[i]][0]), int(triangle_points[index[i]][1])
                 x1, y1 = int(triangle_points[index[i + 1]][0]), int(triangle_points[index[i + 1]][1])
                 x0, y0 = int(triangle_points[index[i + 2]][0]), int(triangle_points[index[i + 2]][1])
+
+            if GL.has_light:
+                lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
             
             # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P0 -> P1.
             L0 = lambda x, y: (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0)
@@ -314,6 +330,11 @@ class GL:
             for si in range(GL.width * 2):
                 for sj in range(GL.height * 2):
                     if inside(si + 0.5, sj + 0.5):
+                        if GL.has_light:
+                            dist = 1
+                            phong = GL.add_phong(colors["shininess"], dist, colors["specularColor"])
+                            color = (object_base_color + ambient + lambert + phong) * 255
+
                         GL.framebuffer[si, sj] = color
             
         # GL.supersampling_2x()
@@ -555,12 +576,11 @@ class GL:
         color = None
         if GL.has_light:
             ambient = GL.add_ambient_light(colors["diffuseColor"])
-            lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
-            phong = GL.add_phong(colors["shininess"], 1, colors["specularColor"])
             object_base_color = np.array(colors["emissiveColor"])
-            color = (object_base_color + ambient + lambert + phong) * 255
+            color = (object_base_color + ambient) * 255
         else:
             color = np.array(colors["diffuseColor"]).astype(int) * 255
+
 
         inside = lambda x, y: x*x + y*y <= radius*radius
 
@@ -626,6 +646,7 @@ class GL:
         GL.light_ambient = ambientIntensity
         GL.light_color = np.array(color)
         GL.light_intensity = intensity
+        GL.location = location
 
     @staticmethod
     def fog(visibilityRange, color):
