@@ -269,7 +269,7 @@ class GL:
                         if GL.has_light:
                             half_vector = GL.light_dir + GL.view_vector
                             half_vector = half_vector /  np.linalg.norm(N)
-                            phong = GL.add_blinn_phong(colors["shininess"], half_vector, colors["specularColor"], N)
+                            blinn_phong = GL.add_blinn_phong(colors["shininess"], half_vector, colors["specularColor"], N)
                             color = (object_base_color + ambient + lambert + phong) * 255
                         GL.framebuffer[si, sj] = color
                         # gpu.GPU.set_pixel(si, sj, color_r, color_g, color_b)
@@ -336,7 +336,7 @@ class GL:
                         if GL.has_light:
                             half_vector = GL.light_dir + GL.view_vector
                             half_vector = half_vector /  np.linalg.norm(N)
-                            phong = GL.add_blinn_phong(colors["shininess"], half_vector, colors["specularColor"])
+                            blinn_phong = GL.add_blinn_phong(colors["shininess"], half_vector, colors["specularColor"])
                             color = (object_base_color + ambient + lambert + phong) * 255
 
                         GL.framebuffer[si, sj] = color
@@ -571,15 +571,15 @@ class GL:
         # raio da esfera que está sendo criada. Para desenha essa esfera você vai
         # precisar tesselar ela em triângulos, para isso encontre os vértices e defina
         # os triângulos.
-
-        # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("Sphere : radius = {0}".format(radius)) # imprime no terminal o raio da esfera
-        # print("Sphere : colors = {0}".format(colors)) # imprime no terminal as cores
-        # print(colors)
-        # radius = 100
         
-        triangles = GL.sphere_triangles(radius)
+        triangles = GL.sphere_triangles(radius, step=60)
+        # print(triangles[0])
         # [((x, y, z), (x, y, z), (x, y, z)), ((x, y, z), (x, y, z), (x, y, z))]
+        print(f"Criou triangulos, {len(triangles)}")
+
+        triangles = np.array(triangles)
+        triangles_screen = GL.prepare_points(triangles.flatten())
+        print(f"Traduziu triangulos para tela, {len(triangles_screen)}")
 
         color = None
         if GL.has_light:
@@ -589,18 +589,25 @@ class GL:
         else:
             color = np.array(colors["diffuseColor"]).astype(int) * 255
 
-        for t in triangles:
-            a = np.array(t[0])
-            b = np.array(t[1])
-            c = np.array(t[2])
+        for i in range(0, len(triangles_screen), 3):
+            a = triangles_screen[i][:-1].flatten()
+            b = triangles_screen[i + 1][:-1].flatten()
+            c = triangles_screen[i + 2][:-1].flatten()
+
+            p1, p2, p3 = triangles[i//3]
+            # print(p1, p2, p3)
+            # exit()
 
             x0, y0, z0 = a[0], a[1], a[2]
             x1, y1, z1 = b[0], b[1], b[2]
             x2, y2, z2 = c[0], c[1], c[2]
+            # continue
 
             if GL.has_light:
-                N = np.cross(c-a, b-a)
+                N = np.cross(p3-p1, p2-p1)
                 N = N / np.linalg.norm(N)
+                # print(N)
+                # exit()
 
                 lambert = GL.add_lambert(colors["diffuseColor"], N)
 
@@ -622,12 +629,21 @@ class GL:
                         if GL.has_light:
                             half_vector = GL.light_dir + GL.view_vector
                             half_vector = half_vector /  np.linalg.norm(N)
-                            phong = GL.add_blinn_phong(colors["shininess"], half_vector, colors["specularColor"], N)
-                            color = (lambert + phong + object_base_color + ambient) * 255
-                            # print(lambert, phong, object_base_color, ambient)
+                            blinn_phong = GL.add_blinn_phong(colors["shininess"], half_vector, colors["specularColor"], N)
+                            # color = (ambient) * 255
+                            color = (lambert) * 255
+                            # print(color)
+                            # print(f"{diffuse*255=}\n{blinn_phong*255=}\n")
                             # exit()
+                            for i in range(len(color)):
+                                c = color[i]
+                                if c > 255:
+                                    color[i] =  255
+                                elif c < 0:
+                                    color[i] = 0
                         GL.framebuffer[si, sj] = color
         print("AA")
+        
         GL.supersampling_2x()
 
     @staticmethod
@@ -640,7 +656,13 @@ class GL:
         # ambientIntensity = 0,0 e direção = (0 0 −1).
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("NavigationInfo : headlight = {0}".format(headlight)) # imprime no terminal
+        # print("NavigationInfo : headlight = {0}".format(headlight)) # imprime no terminal
+        GL.has_light = headlight
+        if headlight:
+            GL.light_ambient = 0
+            GL.light_color = np.array((1, 1, 1)) / np.linalg.norm(np.array([1, 1, 11]))
+            GL.light_intensity = 1
+            GL.light_dir = np.array([0, 1, -1]) / np.linalg.norm(np.array([0, 1, -1]))
 
     @staticmethod
     def directionalLight(ambientIntensity, color, intensity, direction):
@@ -660,9 +682,9 @@ class GL:
 
         GL.has_light = True
         GL.light_ambient = ambientIntensity
-        GL.light_color = color
+        GL.light_color = np.array(color) / np.linalg.norm(color)
         GL.light_intensity = intensity
-        GL.light_dir = direction
+        GL.light_dir = np.array([-direction[0], -direction[1], -direction[2]]) / np.linalg.norm(np.array([-direction[0], -direction[1], -direction[2]]))
 
     @staticmethod
     def pointLight(ambientIntensity, color, intensity, location):
@@ -682,7 +704,7 @@ class GL:
 
         GL.has_light = True
         GL.light_ambient = ambientIntensity
-        GL.light_color = np.array(color)
+        GL.light_color = np.array(color) / np.linalg.norm(color)
         GL.light_intensity = intensity
         GL.location = location
 
@@ -772,15 +794,21 @@ class GL:
     
     @staticmethod
     def add_blinn_phong(shine, half_vector, specular_color, normal):
-        return np.multiply(np.multiply(GL.light_color, np.dot(half_vector, normal) ** int(np.exp2(shine * 6 + 1))), specular_color)
+        specular_light = max(0, np.dot(half_vector, normal))
+        specular_exponent = int(shine * 128)
+        specular_light = specular_light ** specular_exponent
+        specular_light *= specular_light
+        specular_light *= GL.light_intensity
+        return specular_light
         
     @staticmethod
     def add_lambert(obj_difuse_color, normal):
-        return np.array([max(0, x * np.dot(GL.light_dir, normal) * GL.light_intensity) for x in obj_difuse_color])
+        lambert = max(np.dot(GL.light_dir, normal), 0)
+        return np.multiply(np.multiply(np.multiply(lambert, GL.light_color), GL.light_intensity), obj_difuse_color)
     
     @staticmethod
     def add_ambient_light(obj_difuse_color):
-        return np.array([x * GL.light_intensity for x in obj_difuse_color]) * GL.light_color
+        return GL.light_color * np.array(obj_difuse_color) * GL.light_intensity
 
     # Para o futuro (Não para versão atual do projeto.)
     def vertex_shader(self, shader):
