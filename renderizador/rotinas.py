@@ -259,7 +259,6 @@ def box(size, colors):
     print("Box : size = {0}".format(size)) # imprime no terminal pontos
     print("Box : colors = {0}".format(colors)) # imprime no terminal as cores
 
-
 def indexedFaceSet(coord, coordIndex, colorPerVertex, color, colorIndex,
                    texCoord, texCoordIndex, colors, current_texture):
     """Função usada para renderizar IndexedFaceSet."""
