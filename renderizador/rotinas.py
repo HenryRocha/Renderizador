@@ -95,12 +95,18 @@ def polyline2D(lineSegments, colors):
     color_b = int(colors["emissiveColor"][2] * 255)
     color = (color_r, color_g, color_b)
 
-    for i in range(0, len(lineSegments) - 1, 4):
-        x1, y1 = int(lineSegments[i]), int(lineSegments[i + 1])
-        # gpu.GPU.set_pixel(x1, y1, color[0], color[1], color[2])
-        x2, y2 = int(lineSegments[i + 2]), int(lineSegments[i + 3])
-        # gpu.GPU.set_pixel(x2, y2, color[0], color[1], color[2])
-        bresenham_line(x1, y1, x2, y2, color)
+    # print(f"[Polyline2D] {len(lineSegments)=} {lineSegments=}")
+
+    for i in range(0, len(lineSegments) - 1, 2):
+        a_x, a_y = lineSegments[i], lineSegments[i + 1]
+        if i == len(lineSegments) - 2:
+            continue
+        elif i + 2 < len(lineSegments):
+            b_x, b_y = lineSegments[i + 2], lineSegments[i + 3]
+        else:
+            b_x, b_y = lineSegments[0], lineSegments[1]
+        # print(f"[Polyline2D] {i=} {a_x=} {a_y=} {b_x=} {b_y=}")
+        bresenham_line(int(a_x), int(a_y), int(b_x), int(b_y), color)
 
 # web3d.org/documents/specifications/19775-1/V3.0/Part01/components/geometry2D.html#TriangleSet2D
 def triangleSet2D(vertices, colors):
@@ -140,7 +146,7 @@ def triangleSet2D(vertices, colors):
         L2 = lambda x, y: (x - x2) * (y0 - y2) - (y - y2) * (x0 - x2)
 
         # Determina se o ponto está dentro do triângulo ou não.
-        inside = lambda x, y: L0(x, y) > 0 and L1(x, y) > 0 and L2(x, y) > 0
+        inside = lambda x, y: L0(x, y) >= 0 and L1(x, y) >= 0 and L2(x, y) >= 0
 
         for si in range(gpu.GPU.width):
             for sj in range(gpu.GPU.height):
