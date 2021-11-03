@@ -48,7 +48,7 @@ class GL:
         GL.framebuffer = np.zeros([width * 2, height * 2, 3], dtype=np.uint)
 
         GL.has_light = False
-        GL.light_ambient = np.zeros([1, 3])
+        GL.light_ambient_intensity = np.zeros([1, 3])
         GL.light_dir = np.zeros([1, 3])
         GL.light_intensity = 0
         GL.light_color = np.zeros([1, 3])
@@ -169,31 +169,34 @@ class GL:
         Fills the framebuffer with the color of the triangles.
         """
 
-        print(f"[DrawTrianglesLight] {colors=}")
-        print(f"[DrawTrianglesLight] {GL.light_ambient=}")
-        print(f"[DrawTrianglesLight] {GL.light_color=}")
-        print(f"[DrawTrianglesLight] {GL.light_intensity=}")
-        print(f"[DrawTrianglesLight] {GL.light_dir=}")
+        # print(f"[DrawTrianglesLight] {colors=}")
+        # print(f"[DrawTrianglesLight] {GL.light_ambient_intensity=}")
+        # print(f"[DrawTrianglesLight] {GL.light_color=}")
+        # print(f"[DrawTrianglesLight] {GL.light_intensity=}")
+        # print(f"[DrawTrianglesLight] {GL.light_dir=}")
 
-        diffuse_color = np.array(colors["diffuseColor"]).astype(int) * 255
-        emissive_color = np.array(colors["emissiveColor"]).astype(int) * 255
-        ambient_color = np.array(colors["specularColor"]).astype(int) * 255
+        diffuse_color = (np.array(colors["diffuseColor"]) * 255).astype(int)
+        emissive_color = (np.array(colors["emissiveColor"]) * 255).astype(int)
+        specular_color = (np.array(colors["specularColor"]) * 255).astype(int)
+        shininess: float = colors["shininess"]
+        view_vector = np.array([0, 0, 1])
+
+        ambient_color = GL.add_ambient_light(diffuse_color)
 
         for i in range(len(view_triangles)):
             wp_a = np.array(world_triangles[i][0][:3])
             wp_b = np.array(world_triangles[i][1][:3])
             wp_c = np.array(world_triangles[i][2][:3])
-            print(f"[DrawTrianglesLight] {wp_a=} {wp_b=} {wp_c=}")
+            # print(f"[DrawTrianglesLight] {wp_a=} {wp_b=} {wp_c=}")
 
             if GL.has_light:
                 # Calculate the normal of the triangle, using the world points, and normalize it.
                 normal: np.ndarray = np.cross(wp_a - wp_b, wp_a - wp_c)
-                print(f"[DrawTrianglesLight] {normal=}")
                 normal: np.ndarray = normal / np.linalg.norm(normal)
-                print(f"[DrawTrianglesLight] {normal=}")
+                # print(f"[DrawTrianglesLight] {normal=}")
 
                 # Calculate the lambert color of the triangle.
-                lambert: np.ndarray = GL.calculate_lambert_color(diffuse_color, normal)
+                lambert: np.ndarray = GL.add_lambert(diffuse_color, normal)
 
             vp_a = view_triangles[i][0]
             vp_b = view_triangles[i][1]
@@ -210,24 +213,27 @@ class GL:
                 for y in range(int(min_y), int(max_y) + 1):
                     if GL.is_inside_triangle(view_triangles[i], (x, y)):
                         if GL.has_light:
-                            GL.framebuffer[x, y] = np.clip(
-                                (emissive_color + lambert), 0, 255
+                            half_vector = view_vector + GL.light_dir
+                            half_vector = half_vector / np.linalg.norm(half_vector)
+                            # print(f"[DrawTrianglesLight] {half_vector=}")
+                            blinn_phong = GL.add_blinn_phong(
+                                shininess, half_vector, specular_color, normal
                             )
+                            color = np.clip(
+                                (
+                                    emissive_color
+                                    + lambert
+                                    + blinn_phong
+                                    + ambient_color
+                                ),
+                                0,
+                                255,
+                            )
+                            # print(f"[DrawTrianglesLight] {color=}")
+
+                            GL.framebuffer[x, y] = color
                         else:
                             GL.framebuffer[x, y] = diffuse_color
-
-    @staticmethod
-    def calculate_lambert_color(
-        diffuse_color: List[float],
-        normal: np.ndarray,
-    ):
-        """
-        Calculates the lambert color of the triangle.
-        """
-        diff = np.dot(normal, -GL.light_dir)
-        lambert = diff * GL.light_intensity * diffuse_color
-        print(f"[Lighting] {lambert=}")
-        return lambert
 
     @staticmethod
     def triangleSet(point: List[float], colors: Dict[str, List[float]]):
@@ -888,13 +894,17 @@ class GL:
         os triângulos.
         """
 
-        world_triangles: Tuple[Tuple[Tuple[float]]] = GL.sphere_triangles(
-            radius, step=60
+        local_triangles: Tuple[Tuple[Tuple[float]]] = GL.sphere_triangles(
+            radius, step=15
         )
+        # print(f"[Sphere] {local_triangles=}")
+
+        local_points = np.array(local_triangles).flatten()
+        world_triangles = GL.create_world_triangles(local_points)
         # print(f"[Sphere] {world_triangles=}")
 
         view_triangles: Tuple[Tuple[Tuple[float]]] = GL.create_view_triangles(
-            GL.prepare_points(np.array(world_triangles).flatten())
+            GL.prepare_points(local_points)
         )
         # print(f"[Sphere] {view_triangles=}")
 
@@ -923,12 +933,12 @@ class GL:
         # print("NavigationInfo : headlight = {0}".format(headlight)) # imprime no terminal
         GL.has_light = headlight
         if headlight:
-            GL.light_ambient = 0
+            GL.light_ambient_intensity = 0
             GL.light_color = np.array((1, 1, 1))
             GL.light_intensity = 1
-            GL.light_dir = np.array([0, 0, -1])
+            GL.light_dir = -1 * np.array([0, 0, -1])
 
-            print(f"[NavigationInfo] {GL.light_ambient=}")
+            print(f"[NavigationInfo] {GL.light_ambient_intensity=}")
             print(f"[NavigationInfo] {GL.light_color=}")
             print(f"[NavigationInfo] {GL.light_intensity=}")
             print(f"[NavigationInfo] {GL.light_dir=}")
@@ -950,12 +960,12 @@ class GL:
         # print("AAAAAAAAAA")
 
         GL.has_light = True
-        GL.light_ambient = ambientIntensity
+        GL.light_ambient_intensity = ambientIntensity
         GL.light_color = np.array(color)
         GL.light_intensity = intensity
-        GL.light_dir = np.array([-d for d in direction])
+        GL.light_dir = -1 * np.array(direction)
 
-        print(f"[DirectionalLight] {GL.light_ambient=}")
+        print(f"[DirectionalLight] {GL.light_ambient_intensity=}")
         print(f"[DirectionalLight] {GL.light_color=}")
         print(f"[DirectionalLight] {GL.light_intensity=}")
         print(f"[DirectionalLight] {GL.light_dir=}")
@@ -977,12 +987,12 @@ class GL:
         # print("BBBBBBBBBBBBBBBB")
 
         GL.has_light = True
-        GL.light_ambient = ambientIntensity
+        GL.light_ambient_intensity = ambientIntensity
         GL.light_color = np.array(color) / np.linalg.norm(color)
         GL.light_intensity = intensity
         GL.location = location
 
-        print(f"[PointLight] {GL.light_ambient=}")
+        print(f"[PointLight] {GL.light_ambient_intensity=}")
         print(f"[PointLight] {GL.light_color=}")
         print(f"[PointLight] {GL.light_intensity=}")
         print(f"[PointLight] {GL.light_dir=}")
@@ -1079,24 +1089,27 @@ class GL:
 
     @staticmethod
     def add_blinn_phong(shine, half_vector, specular_color, normal):
-        specular_light = max(0, np.dot(half_vector, normal))
+        half_dot_normal = max(0, np.dot(half_vector, normal))
         specular_exponent = int(shine * 128)
-        specular_light = specular_light ** specular_exponent
-        specular_light *= specular_light
-        specular_light *= GL.light_intensity
+        specular_light = (
+            (half_dot_normal ** specular_exponent) * GL.light_intensity * specular_color
+        )
+        # print(f"[BlinnPhong] {specular_light=}")
         return specular_light
 
     @staticmethod
     def add_lambert(obj_difuse_color, normal):
-        lambert = max(np.dot(GL.light_dir, normal), 0)
-        return np.multiply(
-            np.multiply(np.multiply(lambert, GL.light_color), GL.light_intensity),
-            obj_difuse_color,
-        )
+        """
+        Calculates the lambert color of the triangle.
+        """
+        diff = np.dot(normal, GL.light_dir)
+        lambert = diff * GL.light_intensity * obj_difuse_color
+        # print(f"[Lighting] {lambert=}")
+        return lambert
 
     @staticmethod
     def add_ambient_light(obj_difuse_color):
-        return GL.light_color * np.array(obj_difuse_color) * GL.light_intensity
+        return np.array(obj_difuse_color) * GL.light_ambient_intensity
 
     # Para o futuro (Não para versão atual do projeto.)
     def vertex_shader(self, shader):
