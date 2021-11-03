@@ -14,10 +14,10 @@ Data:
 import time
 from typing import Dict, List, Tuple
 
-from PIL.Image import NORMAL  # Para operações com tempo
+import numpy as np
 
 import gpu  # Simula os recursos de uma GPU
-import numpy as np
+from icosahedron import Icosahedron
 
 
 class GL:
@@ -258,10 +258,10 @@ class GL:
         # print(f"[TriangleSet] {colors=}")
 
         world_triangles: Tuple[Tuple[Tuple[float]]] = GL.create_world_triangles(point)
-        print(f"[TriangleSet] {world_triangles=}")
+        # print(f"[TriangleSet] {world_triangles=}")
 
         view_triangles = GL.create_view_triangles(GL.prepare_points(point))
-        print(f"[TriangleSet] {view_triangles=}")
+        # print(f"[TriangleSet] {view_triangles=}")
 
         start = time.time()
         GL.color_triangle_pixels_with_lighting(view_triangles, world_triangles, colors)
@@ -427,41 +427,68 @@ class GL:
         # depois 2, 3 e 4, e assim por diante. Cuidado com a orientação dos vértices, ou seja,
         # todos no sentido horário ou todos no sentido anti-horário, conforme especificado.
 
-        print(f"[TriangleStripSet] {point=}")
-        print(f"[TriangleStripSet] {stripCount=}")
-        print(f"[TriangleStripSet] {colors=}")
+        # print(f"[TriangleStripSet] {point=}")
+        # print(f"[TriangleStripSet] {stripCount=}")
+        # print(f"[TriangleStripSet] {colors=}")
 
-        # Criando uma lista de pontos, onde cada ponto é uma tupla.
-        points: List[Tuple[float]] = []
+        world_points = []
         for i in range(len(point) // 3):
-            points += [(point[i * 3], point[i * 3 + 1], point[i * 3 + 2])]
+            world_points += [
+                np.dot(
+                    GL.mat_mundo,
+                    np.array([point[i * 3], point[i * 3 + 1], point[i * 3 + 2], 1]),
+                )
+            ]
 
-        # Criando a lista de triângulos, seguindo a ordem de stripCount,
-        # onde cada triângulo é uma tupla de pontos.
+        view_points = GL.prepare_points(point)
+
+        view_triangles: List[Tuple[Tuple[float]]] = []
         world_triangles: List[Tuple[Tuple[float]]] = []
         for i in range(stripCount[0] - 2):
-            world_triangles.append((points[i], points[i + 1], points[i + 2]))
-        print(f"[TriangleStripSet] {world_triangles=}")
-
-        prepared_points = GL.prepare_points(point)
-        view_triangles: List[Tuple[Tuple[float]]] = []
-        for i in range(stripCount[0] - 2):
-            view_triangles.append(
-                (prepared_points[i], prepared_points[i + 1], prepared_points[i + 2])
-            )
-        print(f"[TriangleStripSet] {view_triangles=}")
+            view_triangles += [
+                [
+                    view_points[i + 2],
+                    view_points[i + 1],
+                    view_points[i],
+                ]
+            ]
+            world_triangles += [
+                [
+                    world_points[i + 2],
+                    world_points[i + 1],
+                    world_points[i],
+                ]
+            ]
+            if i % 2 == 0:
+                view_triangles += [
+                    [
+                        view_points[i],
+                        view_points[i + 1],
+                        view_points[i + 2],
+                    ]
+                ]
+                world_triangles += [
+                    [
+                        world_points[i],
+                        world_points[i + 1],
+                        world_points[i + 2],
+                    ]
+                ]
 
         start = time.time()
-        GL.color_triangle_pixels(view_triangles, np.array(colors["diffuseColor"]) * 255)
+        # GL.color_triangle_pixels(
+        #     view_triangles, (np.array(colors["diffuseColor"]) * 255).astype(int)
+        # )
+        GL.color_triangle_pixels_with_lighting(view_triangles, world_triangles, colors)
         end = time.time()
         print(
-            f"[TriangleSet] Time taken to calculate the pixels inside: {end - start}s"
+            f"[TriangleStripSet] Time taken to calculate the pixels inside: {end - start}s"
         )
 
         start = time.time()
         GL.supersampling_2x()
         end = time.time()
-        print(f"[TriangleSet] Time taken to Super Sample 2X: {end - start}s")
+        print(f"[TriangleStripSet] Time taken to Super Sample 2X: {end - start}s")
 
     @staticmethod
     def indexedTriangleStripSet(point, index, colors):
@@ -481,81 +508,70 @@ class GL:
         # print("IndexedTriangleStripSet : pontos = {0}, index = {1}".format(point, index))
         # print("IndexedTriangleStripSet : colors = {0}".format(colors)) # imprime as cores
 
-        print(f"[IndexedTriangleStripSet] {point=}")
-        print(f"[IndexedTriangleStripSet] {index=}")
-        print(f"[IndexedTriangleStripSet] {colors=}")
+        # print(f"[IndexedTriangleStripSet] {point=}")
+        # print(f"[IndexedTriangleStripSet] {index=}")
+        # print(f"[IndexedTriangleStripSet] {colors=}")
 
-        # Criando uma lista de pontos, onde cada ponto é uma tupla.
-        points: List[Tuple[float]] = []
+        world_points = []
         for i in range(len(point) // 3):
-            points += [(point[i * 3], point[i * 3 + 1], point[i * 3 + 2])]
+            world_points += [
+                np.dot(
+                    GL.mat_mundo,
+                    np.array([point[i * 3], point[i * 3 + 1], point[i * 3 + 2], 1]),
+                )
+            ]
 
-        return
-        triangle_points = GL.prepare_points(point * 2)
+        view_points = GL.prepare_points(point)
 
-        color = None
-        if GL.has_light:
-            ambient = GL.add_ambient_light(colors["diffuseColor"])
-            object_base_color = np.array(colors["emissiveColor"])
-
-        else:
-            color = np.array(colors["diffuseColor"]).astype(int) * 255
-
+        view_triangles: List[Tuple[Tuple[float]]] = []
+        world_triangles: List[Tuple[Tuple[float]]] = []
         for i in range(len(index) - 3):
+            view_triangles += [
+                [
+                    view_points[index[i + 2]],
+                    view_points[index[i + 1]],
+                    view_points[index[i]],
+                ]
+            ]
+            world_triangles += [
+                [
+                    world_points[index[i + 2]],
+                    world_points[index[i + 1]],
+                    world_points[index[i]],
+                ]
+            ]
             if i % 2 == 0:
-                x0, y0 = int(triangle_points[index[i]][0]), int(
-                    triangle_points[index[i]][1]
-                )
-                x1, y1 = int(triangle_points[index[i + 1]][0]), int(
-                    triangle_points[index[i + 1]][1]
-                )
-                x2, y2 = int(triangle_points[index[i + 2]][0]), int(
-                    triangle_points[index[i + 2]][1]
-                )
-            else:
-                x2, y2 = int(triangle_points[index[i]][0]), int(
-                    triangle_points[index[i]][1]
-                )
-                x1, y1 = int(triangle_points[index[i + 1]][0]), int(
-                    triangle_points[index[i + 1]][1]
-                )
-                x0, y0 = int(triangle_points[index[i + 2]][0]), int(
-                    triangle_points[index[i + 2]][1]
-                )
+                view_triangles += [
+                    [
+                        view_points[index[i]],
+                        view_points[index[i + 1]],
+                        view_points[index[i + 2]],
+                    ]
+                ]
+                world_triangles += [
+                    [
+                        world_points[index[i]],
+                        world_points[index[i + 1]],
+                        world_points[index[i + 2]],
+                    ]
+                ]
 
-            if GL.has_light:
-                lambert = GL.add_lambert(colors["diffuseColor"], [0, -0.577, -0.577])
+        start = time.time()
+        # GL.color_triangle_pixels(
+        #     view_triangles, (np.array(colors["diffuseColor"]) * 255).astype(int)
+        # )
+        GL.color_triangle_pixels_with_lighting(view_triangles, world_triangles, colors)
+        end = time.time()
+        print(
+            f"[IndexedTriangleStripSet] Time taken to calculate the pixels inside: {end - start}s"
+        )
 
-            # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P0 -> P1.
-            L0 = lambda x, y: (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0)
-
-            # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P1 -> P2.
-            L1 = lambda x, y: (x - x1) * (y2 - y1) - (y - y1) * (x2 - x1)
-
-            # Calcula se o ponto (x, y) está acima, abaixo, ou na linha descrita por P2 -> P0.
-            L2 = lambda x, y: (x - x2) * (y0 - y2) - (y - y2) * (x0 - x2)
-
-            # Determina se o ponto está dentro do triângulo ou não.
-            inside = lambda x, y: L0(x, y) >= 0 and L1(x, y) >= 0 and L2(x, y) >= 0
-
-            for si in range(GL.width * 2):
-                for sj in range(GL.height * 2):
-                    if inside(si + 0.5, sj + 0.5):
-                        if GL.has_light:
-                            half_vector = GL.light_dir + GL.view_vector
-                            half_vector = half_vector / np.linalg.norm(N)
-                            blinn_phong = GL.add_blinn_phong(
-                                colors["shininess"],
-                                half_vector,
-                                colors["specularColor"],
-                            )
-                            color = (
-                                object_base_color + ambient + lambert + phong
-                            ) * 255
-
-                        GL.framebuffer[si, sj] = color
-
-        # GL.supersampling_2x()
+        start = time.time()
+        GL.supersampling_2x()
+        end = time.time()
+        print(
+            f"[IndexedTriangleStripSet] Time taken to Super Sample 2X: {end - start}s"
+        )
 
     @staticmethod
     def box(size, colors):
@@ -894,9 +910,20 @@ class GL:
         os triângulos.
         """
 
-        local_triangles: Tuple[Tuple[Tuple[float]]] = GL.sphere_triangles(
-            radius, step=15
-        )
+        # print(f"[Sphere] {radius=}")
+        ico = Icosahedron(radius=radius, subdivisions=5)
+        start = time.time()
+        ico.subdivide()
+        end = time.time()
+        print(f"[Sphere] Time taken to subdivide the icosahedron: {end - start}s")
+        # print(f"[Sphere] {ico.verts=}")
+        # print(f"[Sphere] {ico.faces=}")
+
+        local_triangles = []
+        for face in ico.faces:
+            for point_index in face:
+                point = ico.verts[point_index]
+                local_triangles.append((point[0], point[1], point[2]))
         # print(f"[Sphere] {local_triangles=}")
 
         local_points = np.array(local_triangles).flatten()
@@ -911,14 +938,12 @@ class GL:
         start = time.time()
         GL.color_triangle_pixels_with_lighting(view_triangles, world_triangles, colors)
         end = time.time()
-        print(
-            f"[TriangleSet] Time taken to calculate the pixels inside: {end - start}s"
-        )
+        print(f"[Sphere] Time taken to calculate the pixels inside: {end - start}s")
 
         start = time.time()
         GL.supersampling_2x()
         end = time.time()
-        print(f"[TriangleSet] Time taken to Super Sample 2X: {end - start}s")
+        print(f"[Sphere] Time taken to Super Sample 2X: {end - start}s")
 
     @staticmethod
     def navigationInfo(headlight):
@@ -938,10 +963,10 @@ class GL:
             GL.light_intensity = 1
             GL.light_dir = -1 * np.array([0, 0, -1])
 
-            print(f"[NavigationInfo] {GL.light_ambient_intensity=}")
-            print(f"[NavigationInfo] {GL.light_color=}")
-            print(f"[NavigationInfo] {GL.light_intensity=}")
-            print(f"[NavigationInfo] {GL.light_dir=}")
+            # print(f"[NavigationInfo] {GL.light_ambient_intensity=}")
+            # print(f"[NavigationInfo] {GL.light_color=}")
+            # print(f"[NavigationInfo] {GL.light_intensity=}")
+            # print(f"[NavigationInfo] {GL.light_dir=}")
 
     @staticmethod
     def directionalLight(ambientIntensity, color, intensity, direction):
@@ -965,10 +990,10 @@ class GL:
         GL.light_intensity = intensity
         GL.light_dir = -1 * np.array(direction)
 
-        print(f"[DirectionalLight] {GL.light_ambient_intensity=}")
-        print(f"[DirectionalLight] {GL.light_color=}")
-        print(f"[DirectionalLight] {GL.light_intensity=}")
-        print(f"[DirectionalLight] {GL.light_dir=}")
+        # print(f"[DirectionalLight] {GL.light_ambient_intensity=}")
+        # print(f"[DirectionalLight] {GL.light_color=}")
+        # print(f"[DirectionalLight] {GL.light_intensity=}")
+        # print(f"[DirectionalLight] {GL.light_dir=}")
 
     @staticmethod
     def pointLight(ambientIntensity, color, intensity, location):
@@ -992,10 +1017,10 @@ class GL:
         GL.light_intensity = intensity
         GL.location = location
 
-        print(f"[PointLight] {GL.light_ambient_intensity=}")
-        print(f"[PointLight] {GL.light_color=}")
-        print(f"[PointLight] {GL.light_intensity=}")
-        print(f"[PointLight] {GL.light_dir=}")
+        # print(f"[PointLight] {GL.light_ambient_intensity=}")
+        # print(f"[PointLight] {GL.light_color=}")
+        # print(f"[PointLight] {GL.light_intensity=}")
+        # print(f"[PointLight] {GL.light_dir=}")
 
     @staticmethod
     def fog(visibilityRange, color):
@@ -1117,51 +1142,3 @@ class GL:
 
     def fragment_shader(self, shader):
         """Para no futuro implementar um fragment shader."""
-
-    @staticmethod
-    def sphere_triangles(radius, step=10):
-        """
-        Create a list of triangles on a sphere
-        """
-        import math
-
-        triangles = []
-        for theta in range(0, 360, step):
-            for phi in range(0, 360, step):
-                r_theta = math.radians(theta)
-                cos_r_theta = math.cos(r_theta)
-                sin_r_theta = math.sin(r_theta)
-                r_theta_step = math.radians(theta + step)
-                cos_r_theta_step = math.cos(r_theta_step)
-                sin_r_theta_step = math.sin(r_theta_step)
-
-                r_phi = math.radians(phi)
-                cos_r_phi = math.cos(r_phi)
-                sin_r_phi = math.sin(r_phi)
-                r_phi_step = math.radians(phi + step)
-                cos_r_phi_step = math.cos(r_phi_step)
-                sin_r_phi_step = math.sin(r_phi_step)
-
-                p1 = (
-                    radius * cos_r_theta * cos_r_phi,
-                    radius * sin_r_theta * cos_r_phi,
-                    radius * sin_r_phi,
-                )
-                p2 = (
-                    radius * cos_r_theta * cos_r_phi_step,
-                    radius * sin_r_theta * cos_r_phi_step,
-                    radius * sin_r_phi_step,
-                )
-                p3 = (
-                    radius * cos_r_theta_step * cos_r_phi,
-                    radius * sin_r_theta_step * cos_r_phi,
-                    radius * sin_r_phi,
-                )
-                p4 = (
-                    radius * cos_r_theta_step * cos_r_phi_step,
-                    radius * sin_r_theta_step * cos_r_phi_step,
-                    radius * sin_r_phi_step,
-                )
-                triangles.append((p1, p2, p3))
-                triangles.append((p2, p4, p3))
-        return tuple(triangles)
