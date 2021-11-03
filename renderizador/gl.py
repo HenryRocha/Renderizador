@@ -56,7 +56,7 @@ class GL:
         GL.view_vector = np.array([0, 0, 1])
 
     @staticmethod
-    def create_tuple_of_triangles(points: List[float]) -> Tuple[Tuple[Tuple[float]]]:
+    def create_world_triangles(points: List[float]) -> Tuple[Tuple[Tuple[float]]]:
         """
         Create a tuple where each element is another tuple with 3 tuples.
 
@@ -77,33 +77,22 @@ class GL:
 
         triangles = []
         for i in range(0, len(points), 9):
-            # current_point = GL.mat_mundo.dot(current_point)
+            p_a = np.array([[points[i]], [points[i + 1]], [points[i + 2]], [1]])
+            p_b = np.array([[points[i + 3]], [points[i + 4]], [points[i + 5]], [1]])
+            p_c = np.array([[points[i + 6]], [points[i + 7]], [points[i + 8]], [1]])
 
             triangles.append(
                 (
-                    (
-                        GL.mat_mundo.dot(points[i]),
-                        GL.mat_mundo.dot(points[i + 1]),
-                        GL.mat_mundo.dot(points[i + 2]),
-                    ),
-                    (
-                        GL.mat_mundo.dot(points[i + 3]),
-                        GL.mat_mundo.dot(points[i + 4]),
-                        GL.mat_mundo.dot(points[i + 5]),
-                    ),
-                    (
-                        GL.mat_mundo.dot(points[i + 6]),
-                        GL.mat_mundo.dot(points[i + 7]),
-                        GL.mat_mundo.dot(points[i + 8]),
-                    ),
+                    tuple(GL.mat_mundo.dot(p_a).flatten()),
+                    tuple(GL.mat_mundo.dot(p_b).flatten()),
+                    tuple(GL.mat_mundo.dot(p_c).flatten()),
                 )
             )
         return tuple(triangles)
 
     @staticmethod
-    def create_tuple_of_triangles_from_world_points(
+    def create_view_triangles(
         view_points: Tuple[Tuple[float]],
-        world_points: Tuple[Tuple[float]] = (),
     ) -> Tuple[Tuple[Tuple[float]]]:
         """
         Create a tuple where each element is another tuple with 3 tuples.
@@ -123,20 +112,12 @@ class GL:
         )
         """
 
-        print(view_points, world_points)
         triangles_screen = []
-        triangles_world = []
         for i in range(0, len(view_points), 3):
             triangles_screen.append(
                 (view_points[i], view_points[i + 1], view_points[i + 2])
             )
-            if len(world_points) > 0:
-                triangles_world.append(
-                    (world_points[i], world_points[i + 1], world_points[i + 2])
-                )
 
-        if len(world_points) > 0:
-            return tuple(triangles_screen), tuple(triangles_world)
         return tuple(triangles_screen)
 
     @staticmethod
@@ -270,20 +251,11 @@ class GL:
         # print(f"[TriangleSet] {point=}")
         # print(f"[TriangleSet] {colors=}")
 
-        world_triangles: Tuple[Tuple[Tuple[float]]] = GL.create_tuple_of_triangles(
-            point
-        )
-        # print(f"[TriangleSet] {world_triangles=}")
+        world_triangles: Tuple[Tuple[Tuple[float]]] = GL.create_world_triangles(point)
+        print(f"[TriangleSet] {world_triangles=}")
 
-        view, world = GL.prepare_points(point, return_world=True)
-        print(f"[TriangleSet] {view=}")
-        print(f"[TriangleSet] {world=}")
-
-        (
-            view_triangles,
-            world_triangles,
-        ) = GL.create_tuple_of_triangles_from_world_points(view, world)
-        # print(f"[TriangleSet] {view_triangles=}")
+        view_triangles = GL.create_view_triangles(GL.prepare_points(point))
+        print(f"[TriangleSet] {view_triangles=}")
 
         start = time.time()
         GL.color_triangle_pixels_with_lighting(view_triangles, world_triangles, colors)
@@ -857,19 +829,19 @@ class GL:
         )
 
     @staticmethod
-    def prepare_points(point, return_world: bool = False) -> Tuple[Tuple[float]]:
+    def prepare_points(points) -> Tuple[Tuple[float]]:
         GL.lookAt = np.linalg.inv(GL.orient_mat_cam).dot(
             np.linalg.inv(GL.trans_mat_cam)
         )
 
         screen_points = []
-        world_points = []
-        for i in range(0, len(point), 3):
-            current_point = np.array([[point[i]], [point[i + 1]], [point[i + 2]], [1]])
+        for i in range(0, len(points), 3):
+            current_point = np.array(
+                [[points[i]], [points[i + 1]], [points[i + 2]], [1]]
+            )
 
             # Transformação do ponto para coordenadas de tela
             current_point = GL.mat_mundo.dot(current_point)
-            world_points.append(tuple(current_point.flatten()))
             current_point = GL.lookAt.dot(current_point)
 
             # Leva o ponto para as coordenadas de perspectiva
@@ -881,10 +853,6 @@ class GL:
             current_point = GL.screen_mat.dot(current_point)
             current_point[2][0] = actual_z
             screen_points.append(tuple(current_point.flatten()))
-
-        if return_world:
-            print("aaaa")
-            return tuple(screen_points), tuple(world_points)
 
         return tuple(screen_points)
 
@@ -925,15 +893,12 @@ class GL:
         )
         # print(f"[Sphere] {world_triangles=}")
 
-        view_triangles: Tuple[
-            Tuple[Tuple[float]]
-        ] = GL.create_tuple_of_triangles_from_world_points(
+        view_triangles: Tuple[Tuple[Tuple[float]]] = GL.create_view_triangles(
             GL.prepare_points(np.array(world_triangles).flatten())
         )
         # print(f"[Sphere] {view_triangles=}")
 
         start = time.time()
-        # GL.color_triangle_pixels(view_triangles, np.array(colors["diffuseColor"]).astype(int) * 255)
         GL.color_triangle_pixels_with_lighting(view_triangles, world_triangles, colors)
         end = time.time()
         print(
