@@ -671,7 +671,7 @@ class GL:
         # cor da textura conforme a posição do mapeamento. Dentro da classe GPU já está
         # implementadado um método para a leitura de imagens.
 
-        triangle_points = GL.prepare_points(coord * 2)
+        triangle_points = GL.prepare_points(coord)
 
         if texCoord and texCoordIndex and current_texture:
             texture = gpu.GPU.load_texture(current_texture[0])
@@ -704,34 +704,34 @@ class GL:
                 x0, y0, z0 = (
                     (triangle_points[coordIndex[i + 0]][0]),
                     (triangle_points[coordIndex[i + 0]][1]),
-                    triangle_points[coordIndex[i + 0]][2][0],
+                    triangle_points[coordIndex[i + 0]][2],
                 )
                 x1, y1, z1 = (
                     (triangle_points[coordIndex[i + 1]][0]),
                     (triangle_points[coordIndex[i + 1]][1]),
-                    triangle_points[coordIndex[i + 1]][2][0],
+                    triangle_points[coordIndex[i + 1]][2],
                 )
                 x2, y2, z2 = (
                     (triangle_points[coordIndex[i + 2]][0]),
                     (triangle_points[coordIndex[i + 2]][1]),
-                    triangle_points[coordIndex[i + 2]][2][0],
+                    triangle_points[coordIndex[i + 2]][2],
                 )
 
             else:
                 x2, y2, z2 = (
                     (triangle_points[coordIndex[i + 0]][0]),
                     (triangle_points[coordIndex[i + 0]][1]),
-                    triangle_points[coordIndex[i + 0]][2][0],
+                    triangle_points[coordIndex[i + 0]][2],
                 )
                 x1, y1, z1 = (
                     (triangle_points[coordIndex[i + 1]][0]),
                     (triangle_points[coordIndex[i + 1]][1]),
-                    triangle_points[coordIndex[i + 1]][2][0],
+                    triangle_points[coordIndex[i + 1]][2],
                 )
                 x0, y0, z0 = (
                     (triangle_points[coordIndex[i + 2]][0]),
                     (triangle_points[coordIndex[i + 2]][1]),
-                    triangle_points[coordIndex[i + 2]][2][0],
+                    triangle_points[coordIndex[i + 2]][2],
                 )
 
             z0 = 1 / z0
